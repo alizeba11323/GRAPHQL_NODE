@@ -22,21 +22,37 @@ const books = [
     name: "Book Four",
     author: "Author Four",
   },
+  {
+    id: 5,
+    name: "Book Five",
+    author: "Author One",
+  },
 ];
+
 const typeDefs = `
  type Book {
     id: ID!,
     name:String,
-    author:String
+    author:String,
+    status: String 
+ }
+ type CreateBook {
+  message: String!,
+  book:[Book!]!
  }
  type Query {
     hello:String,
     getAllBooks:[Book!]! 
     getSingleBook(id:ID!):Book
  }
-
+ input CreateInputType {
+  id: ID!,
+  name:String!,
+  author: String,
+  status:String!
+ }
  type Mutation {
-    createBook(id: ID!,name:String!,author: String): Book!
+    createBook(inputBook:CreateInputType): CreateBook!
  }
 
 `;
@@ -53,9 +69,12 @@ const resolvers = {
     },
   },
   Mutation: {
-    createBook(_, { id, name, author }, context, info) {
-      const l = books.push({ id, name, author });
-      return books[l - 1];
+    createBook(_, { inputBook: { id, name, author } }, context, info) {
+      books.push({ id, name, author });
+      return {
+        message: "Book Created Successfully",
+        book: books,
+      };
     },
   },
 };
