@@ -5,76 +5,122 @@ const books = [
   {
     id: 1,
     name: "Book One",
-    author: "Author One",
+    author: 1,
+    status: "not_available",
   },
   {
     id: 2,
     name: "Book Two",
-    author: "Author Two",
+    author: 2,
+    status: "available",
   },
   {
     id: 3,
     name: "Book Three",
-    author: "Author Three",
+    author: 3,
+    status: "not_available",
   },
   {
     id: 4,
     name: "Book Four",
-    author: "Author Four",
+    author: 3,
+    status: "not_available",
   },
   {
     id: 5,
     name: "Book Five",
-    author: "Author One",
+    author: 1,
+    status: "not_available",
+  },
+];
+
+let author = [
+  {
+    id: 1,
+    name: "Author One",
+    books: [1, 5],
+  },
+  {
+    id: 2,
+    name: "Author Two",
+    books: [2],
+  },
+  {
+    id: 3,
+    name: "Author Three",
+    books: [3, 4],
   },
 ];
 
 const typeDefs = `
- type Book {
-    id: ID!,
-    name:String,
-    author:String,
-    status: String 
- }
- type CreateBook {
-  message: String!,
-  book:[Book!]!
- }
- type Query {
-    hello:String,
-    getAllBooks:[Book!]! 
-    getSingleBook(id:ID!):Book
- }
- input CreateInputType {
-  id: ID!,
+enum STATUS {
+  available,
+  not_available
+}
+type Book {
+  id:ID!,
   name:String!,
-  author: String,
-  status:String!
- }
- type Mutation {
-    createBook(inputBook:CreateInputType): CreateBook!
- }
+  author: Author,
+  status:STATUS
+}
+type Author {
+  id:ID!,
+  name:String!
+  books:[Book!]!
+}
+type Query{
+  getAllBooks:[Book!]!
+}
+input CreateBookInput {
+  id:ID!
+  name: String!
+  author:ID!
+  status:STATUS
+}
+type Mutation{
+  createBook(inp:CreateBookInput):[Book!]!
+}
+
+
 
 `;
+
 const resolvers = {
-  Query: {
-    hello() {
-      return "Hello World";
+  Author: {
+    books(parent, args, context, info) {
+      const items = books.filter((item) => parent.books.includes(item.id));
+      return items;
     },
+  },
+  Book: {
+    author(parent, args, context, info) {
+      const aut = author.find((au) => au.id === parent.author);
+      return aut;
+    },
+  },
+
+  Query: {
     getAllBooks() {
       return books;
     },
-    getSingleBook(parent, { id }, context, info) {
-      return books.find((book) => book.id === Number(id));
-    },
   },
   Mutation: {
-    createBook(_, { inputBook: { id, name, author } }, context, info) {
-      books.push({ id, name, author });
-      return {
-        message: "Book Created Successfully",
-        book: books,
-      };
+    createBook(
+      parent,
+      { inp: { id, name, author: bookAuthor, status } },
+      context,
+      info
+    ) {
+      books.push({ id: Number(id), name, author: Number(bookAuthor), status });
+      const a = author.map((auth) => {
+        if (auth.id === Number(bookAuthor)) {
+          auth.books.push(Number(id));
+          return auth;
+        }
+        return auth;
+      });
+      author = a;
+      return books;
     },
   },
 };
@@ -86,3 +132,8 @@ const server = new ApolloServer({
 startStandaloneServer(server, { listen: 4000 }).then(({ url }) =>
   console.log("App running on server " + url)
 );
+
+// status : {
+//   not_available,
+//   available
+// }
