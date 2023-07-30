@@ -1,61 +1,34 @@
 import { ApolloServer } from "@apollo/server";
 import { startStandaloneServer } from "@apollo/server/standalone";
-
-const books = [
-  {
-    id: 1,
-    name: "Book One",
-    author: 1,
-    status: "not_available",
-  },
-  {
-    id: 2,
-    name: "Book Two",
-    author: 2,
-    status: "available",
-  },
-  {
-    id: 3,
-    name: "Book Three",
-    author: 3,
-    status: "not_available",
-  },
-  {
-    id: 4,
-    name: "Book Four",
-    author: 3,
-    status: "not_available",
-  },
-  {
-    id: 5,
-    name: "Book Five",
-    author: 1,
-    status: "not_available",
-  },
-];
-
-let author = [
-  {
-    id: 1,
-    name: "Author One",
-    books: [1, 5],
-  },
-  {
-    id: 2,
-    name: "Author Two",
-    books: [2],
-  },
-  {
-    id: 3,
-    name: "Author Three",
-    books: [3, 4],
-  },
-];
+import db from "./db.js";
 
 const typeDefs = `
 enum STATUS {
   available,
   not_available
+}
+interface Book1 {
+  id:ID!,
+  title:String
+}
+type Courses {
+  id:ID!,
+  name: String!
+}
+type TextBook implements Book1 {
+  id:ID!,
+  title:String
+  courses:[Courses!]!
+}
+enum COLOR {
+  GREEN,
+  BLUE,
+  RED
+}
+type ColorTextBook implements Book1 {
+  id:ID!,
+  title:String,
+  color:COLOR
 }
 type Book {
   id:ID!,
@@ -68,8 +41,15 @@ type Author {
   name:String!
   books:[Book!]!
 }
+type Error {
+  message: String!,
+  id:ID!
+}
+union BookResult = Book | Error
 type Query{
   getAllBooks:[Book!]!
+  getSingleBook(id:ID!): BookResult!,
+  getAllBooks1:[Book1]
 }
 input CreateBookInput {
   id:ID!
@@ -81,27 +61,67 @@ type Mutation{
   createBook(inp:CreateBookInput):[Book!]!
 }
 
-
-
 `;
 
 const resolvers = {
+  TextBook: {
+    courses: (parent, args, context, info) => {
+      return context.courses.filter((item) => parent.courses.includes(item.id));
+    },
+  },
+  Book1: {
+    __resolveType(obj, context, info) {
+      if (obj.courses) {
+        return "TextBook";
+      }
+      if (obj.color) {
+        return "ColorTextBook";
+      }
+      return null;
+    },
+  },
+  BookResult: {
+    __resolveType(obj, context, info) {
+      if (obj.message) {
+        return "Error";
+      }
+      if (obj.name) {
+        return "Book";
+      }
+      return null;
+    },
+  },
   Author: {
     books(parent, args, context, info) {
-      const items = books.filter((item) => parent.books.includes(item.id));
+      const items = context.books.filter((item) =>
+        parent.books.includes(item.id)
+      );
       return items;
     },
   },
   Book: {
     author(parent, args, context, info) {
-      const aut = author.find((au) => au.id === parent.author);
+      const aut = context.author.find((au) => au.id === parent.author);
       return aut;
     },
   },
 
   Query: {
-    getAllBooks() {
-      return books;
+    getAllBooks1(parent, args, context, info) {
+      return context.books1;
+    },
+    getAllBooks(parent, args, context, info) {
+      return context.books;
+    },
+    getSingleBook(parent, { id }, context, info) {
+      const book = context.books.find((book) => book.id === Number(id));
+      if (!book) {
+        return {
+          message: "Book Not Found",
+          id,
+        };
+      }
+      return book;
     },
   },
   Mutation: {
@@ -111,16 +131,21 @@ const resolvers = {
       context,
       info
     ) {
-      books.push({ id: Number(id), name, author: Number(bookAuthor), status });
-      const a = author.map((auth) => {
+      context.books.push({
+        id: Number(id),
+        name,
+        author: Number(bookAuthor),
+        status,
+      });
+      const a = context.author.map((auth) => {
         if (auth.id === Number(bookAuthor)) {
           auth.books.push(Number(id));
           return auth;
         }
         return auth;
       });
-      author = a;
-      return books;
+      context.author = a;
+      return context.books;
     },
   },
 };
@@ -129,11 +154,14 @@ const server = new ApolloServer({
   resolvers,
 });
 
-startStandaloneServer(server, { listen: 4000 }).then(({ url }) =>
-  console.log("App running on server " + url)
-);
-
-// status : {
-//   not_available,
-//   available
-// }
+startStandaloneServer(server, {
+  listen: 4000,
+  context: () => {
+    return {
+      books: db.books,
+      author: db.author,
+      books1: db.books1,
+      courses: db.courses,
+    };
+  },
+}).then(({ url }) => console.log("App running on server " + url));
